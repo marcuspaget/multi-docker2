@@ -1,0 +1,35 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t marcuspaget/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run marcuspaget/react-test npm test -- --coverage
+
+after_success:
+  - docker build -t marcuspaget/multi-client ./client
+  - docker build -t marcuspaget/multi-nginx ./nginx
+  - docker build -t marcuspaget/multi-server ./server
+  - docker build -t marcuspaget/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push marcuspaget/multi-client
+  - docker push marcuspaget/multi-nginx
+  - docker push marcuspaget/multi-server
+  - docker push marcuspaget/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: us-west-1
+  app: multi-docker
+  env: MultiDocker-env
+  bucket_name: elasticbeanstalk-us-west-1-306476627547
+  bucket_path: docker-multi
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key:
+    secure: $AWS_SECRET_KEY
